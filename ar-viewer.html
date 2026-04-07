@@ -131,8 +131,8 @@ function initGalaxy() {
   // Inner sphere
   sun.add(new THREE.Mesh(new THREE.SphereGeometry(0.25, 32, 32), new THREE.MeshBasicMaterial({ color: 0xFFB800 })));
 
-  // Glow layers
-  [{ s: 1.8, o: 0.5, c: 0xFFB800 }, { s: 3.5, o: 0.2, c: 0xff8c00 }, { s: 5.0, o: 0.08, c: 0xff6600 }].forEach(function(g) {
+  // Glow layers (subtle)
+  [{ s: 1.0, o: 0.35, c: 0xFFB800 }, { s: 1.6, o: 0.12, c: 0xff8c00 }, { s: 2.2, o: 0.04, c: 0xff6600 }].forEach(function(g) {
     var m = new THREE.SpriteMaterial({ map: makeGlow(g.c), transparent: true, opacity: g.o, blending: THREE.AdditiveBlending, depthWrite: false });
     var s = new THREE.Sprite(m); s.scale.set(g.s, g.s, 1); sun.add(s);
   });
@@ -241,6 +241,77 @@ function initGalaxy() {
     scene.add(sLine);
     shootingStars.push(sLine);
   }
+
+  // === ASTEROIDS WITH FIRE TAILS ===
+  for (var ai = 0; ai < 5; ai++) {
+    var asteroid = new THREE.Group();
+
+    // Rocky body — irregular shape using icosahedron
+    var aGeo = new THREE.IcosahedronGeometry(0.08 + Math.random() * 0.12, 0);
+    // Distort vertices for rocky look
+    var aVerts = aGeo.attributes.position;
+    for (var vi = 0; vi < aVerts.count; vi++) {
+      aVerts.setX(vi, aVerts.getX(vi) * (0.7 + Math.random() * 0.6));
+      aVerts.setY(vi, aVerts.getY(vi) * (0.7 + Math.random() * 0.6));
+      aVerts.setZ(vi, aVerts.getZ(vi) * (0.7 + Math.random() * 0.6));
+    }
+    aGeo.computeVertexNormals();
+    var aMat = new THREE.MeshBasicMaterial({ color: new THREE.Color().setHSL(0.07 + Math.random()*0.05, 0.4, 0.25 + Math.random()*0.15) });
+    var aBody = new THREE.Mesh(aGeo, aMat);
+    asteroid.add(aBody);
+
+    // Hot glow on asteroid surface
+    var aGlowMat = new THREE.SpriteMaterial({ map: makeGlow(0xff6600), transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false });
+    var aGlow = new THREE.Sprite(aGlowMat);
+    aGlow.scale.set(0.5, 0.5, 1);
+    asteroid.add(aGlow);
+
+    // Fire tail — trail of particles
+    var tailCount = 40;
+    var tailPos = new Float32Array(tailCount * 3);
+    var tailCol = new Float32Array(tailCount * 3);
+    var tailSizes = new Float32Array(tailCount);
+    for (var ti = 0; ti < tailCount; ti++) {
+      tailPos[ti*3] = 0; tailPos[ti*3+1] = 0; tailPos[ti*3+2] = 0;
+      var fade = 1 - (ti / tailCount);
+      // Fire gradient: white-yellow-orange-red-transparent
+      if (fade > 0.7) { tailCol[ti*3] = 1; tailCol[ti*3+1] = 0.95; tailCol[ti*3+2] = 0.7; }
+      else if (fade > 0.4) { tailCol[ti*3] = 1; tailCol[ti*3+1] = 0.5 + fade*0.3; tailCol[ti*3+2] = 0.1; }
+      else { tailCol[ti*3] = 0.8; tailCol[ti*3+1] = 0.15; tailCol[ti*3+2] = 0.05; }
+      tailSizes[ti] = fade * 3;
+    }
+    var tailGeo = new THREE.BufferGeometry();
+    tailGeo.setAttribute('position', new THREE.BufferAttribute(tailPos, 3));
+    tailGeo.setAttribute('color', new THREE.BufferAttribute(tailCol, 3));
+    var tailMat = new THREE.PointsMaterial({ size: 0.06, map: makeStar(), transparent: true, opacity: 0.7, vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true });
+    var tailPoints = new THREE.Points(tailGeo, tailMat);
+    scene.add(tailPoints);
+
+    // Orbit params — elliptical orbits at various inclinations
+    var orbitRadius = 2.5 + Math.random() * 5;
+    var eccentricity = 0.2 + Math.random() * 0.4;
+    var inclination = (Math.random() - 0.5) * 0.6;
+    var speed = 0.08 + Math.random() * 0.12;
+    var phase = Math.random() * Math.PI * 2;
+
+    asteroid.userData = {
+      orbitRadius: orbitRadius,
+      eccentricity: eccentricity,
+      inclination: inclination,
+      speed: speed,
+      phase: phase,
+      tailPositions: [],
+      tailPoints: tailPoints,
+      tailCount: tailCount
+    };
+
+    scene.add(asteroid);
+    planets.push(asteroid); // reuse planets array for update loop — we'll handle separately
+  }
+
+  // Track asteroids separately
+  window._asteroids = planets.slice(-5);
+  planets = planets.slice(0, -5);
 
   // === BACKGROUND STARS ===
   var bgPos = new Float32Array(800 * 3);
@@ -434,6 +505,31 @@ function animate() {
   planets.forEach(function(p) {
     var a = t * p.userData.speed + p.userData.offset;
     p.position.set(Math.cos(a) * p.userData.radius, Math.sin(a * 2) * 0.04, Math.sin(a) * p.userData.radius);
+  });
+
+  // Asteroids with fire tails
+  if (window._asteroids) window._asteroids.forEach(function(ast) {
+    var d = ast.userData;
+    var angle = t * d.speed + d.phase;
+    var r = d.orbitRadius * (1 - d.eccentricity * Math.cos(angle));
+    var x = Math.cos(angle) * r;
+    var z = Math.sin(angle) * r;
+    var y = Math.sin(angle) * d.inclination * r * 0.3;
+    ast.position.set(x, y, z);
+
+    // Rotate the rock
+    ast.children[0].rotation.x += 0.02;
+    ast.children[0].rotation.y += 0.03;
+
+    // Update fire tail — shift positions back and set head to current pos
+    var tp = d.tailPoints.geometry.attributes.position.array;
+    for (var ti = d.tailCount - 1; ti > 0; ti--) {
+      tp[ti*3]   = tp[(ti-1)*3]   + (Math.random()-0.5)*0.01;
+      tp[ti*3+1] = tp[(ti-1)*3+1] + (Math.random()-0.5)*0.01;
+      tp[ti*3+2] = tp[(ti-1)*3+2] + (Math.random()-0.5)*0.01;
+    }
+    tp[0] = x; tp[1] = y; tp[2] = z;
+    d.tailPoints.geometry.attributes.position.needsUpdate = true;
   });
 
   // Nebula drift
