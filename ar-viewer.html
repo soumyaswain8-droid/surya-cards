@@ -82,7 +82,8 @@ var people = {
   k: { name: 'KISHORE RAJENDRA', title: 'CO-FOUNDER & CTO', email: 'kishore@devpilot.co.in', linkedin: 'kishorer747', telegram: '@chi_shift' },
   s: { name: 'SOUMYA SWAIN', title: 'CO-FOUNDER & FOUNDING MEMBER', email: 'sowmya@devpilot.co.in', linkedin: 'soumya-swain', telegram: '@soumyaswian' }
 };
-var currentPerson = 'k';
+// Auto-detect person from URL hash: ar-viewer.html#s = Soumya, #k = Kishore
+var currentPerson = (location.hash === '#s') ? 's' : 'k';
 
 var textLayout = {
   name:     { pos: [5.0, 2.0, -2.5],   scale: 2.0, color: '#ffffff', glow: '#FFB800' },
@@ -98,6 +99,11 @@ function launch(withCamera) {
   document.getElementById('topControls').classList.remove('hidden');
   document.getElementById('bottomControls').classList.remove('hidden');
   document.getElementById('navHint').classList.remove('hidden');
+  // Set correct person toggle on load
+  if (currentPerson === 's') {
+    document.getElementById('btnK').classList.remove('active');
+    document.getElementById('btnS').classList.add('active');
+  }
   if (withCamera) { arMode = true; startCamera(); document.getElementById('arToggle').classList.add('active-btn'); document.getElementById('arToggle').textContent = 'AR: ON'; }
   initGalaxy();
   initControls();
