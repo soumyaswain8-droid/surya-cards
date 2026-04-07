@@ -64,14 +64,9 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<!-- No bloom - clean rendering for readable text -->
 <script>
-var scene, camera, renderer, composer, bloomPass;
+var scene, camera, renderer;
 var sun, galaxyParticles, nebulaSprites = [], planets = [], textSprites = [];
 var shootingStars = [];
 var arMode = false;
@@ -123,16 +118,7 @@ function initGalaxy() {
   renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
   document.body.appendChild(renderer.domElement);
-
-  // BLOOM post-processing
-  var renderPass = new THREE.RenderPass(scene, camera);
-  bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.4, 0.5, 0.5);
-  composer = new THREE.EffectComposer(renderer);
-  composer.addPass(renderPass);
-  composer.addPass(bloomPass);
 
   // === SUN (multi-layer) ===
   sun = new THREE.Group();
@@ -277,7 +263,6 @@ function initGalaxy() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-    composer.setSize(window.innerWidth, window.innerHeight);
   });
 }
 
@@ -333,52 +318,30 @@ function makeNebula(color) {
 function makeTextSprite(text, fontSize, color, glowHex) {
   var canvas = document.createElement('canvas');
   var ctx = canvas.getContext('2d');
-  var dpr = 3;
+  var dpr = 2;
   ctx.font = 'bold ' + (fontSize * dpr) + 'px Orbitron, sans-serif';
-  var w = ctx.measureText(text).width + 60 * dpr;
-  var h = (fontSize * dpr) + 40 * dpr;
+  var w = ctx.measureText(text).width + 40 * dpr;
+  var h = (fontSize * dpr) + 30 * dpr;
   canvas.width = w; canvas.height = h;
 
-  // Dark backdrop pill for readability
-  var pillPad = 12 * dpr;
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-  var rr = 8 * dpr;
-  var px = pillPad, py = pillPad, pw = w - pillPad * 2, ph = h - pillPad * 2;
-  ctx.beginPath();
-  ctx.moveTo(px + rr, py); ctx.lineTo(px + pw - rr, py);
-  ctx.quadraticCurveTo(px + pw, py, px + pw, py + rr);
-  ctx.lineTo(px + pw, py + ph - rr);
-  ctx.quadraticCurveTo(px + pw, py + ph, px + pw - rr, py + ph);
-  ctx.lineTo(px + rr, py + ph);
-  ctx.quadraticCurveTo(px, py + ph, px, py + ph - rr);
-  ctx.lineTo(px, py + rr);
-  ctx.quadraticCurveTo(px, py, px + rr, py);
-  ctx.closePath();
-  ctx.fill();
-
-  // Subtle border glow
-  ctx.strokeStyle = (glowHex || color) + '55';
-  ctx.lineWidth = 1.5 * dpr;
-  ctx.stroke();
-
-  // Text with glow
+  // Glow behind text
   ctx.shadowColor = glowHex || color;
-  ctx.shadowBlur = 12 * dpr;
+  ctx.shadowBlur = 15 * dpr;
   ctx.fillStyle = color;
   ctx.font = 'bold ' + (fontSize * dpr) + 'px Orbitron, sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(text, w / 2, h / 2);
 
-  // Crisp pass
+  // Crisp second pass
   ctx.shadowBlur = 0;
   ctx.fillText(text, w / 2, h / 2);
 
   var tex = new THREE.CanvasTexture(canvas);
   tex.minFilter = THREE.LinearFilter;
-  var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, blending: THREE.NormalBlending, depthWrite: false });
+  var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
   var sprite = new THREE.Sprite(mat);
   var aspect = w / h;
-  sprite.scale.set(aspect * 0.55, 0.55, 1);
+  sprite.scale.set(aspect * 0.5, 0.5, 1);
   return sprite;
 }
 
@@ -517,11 +480,8 @@ function animate() {
   // Connection line pulse
   linkLines.forEach(function(l, i) { l.material.opacity = 0.03 + Math.sin(t * 0.8 + i * 0.9) * 0.02; });
 
-  // Bloom + AR transparency
   renderer.setClearColor(0x000000, arMode ? 0 : 1);
-  bloomPass.strength = arMode ? 1.8 : 1.4;
-
-  composer.render();
+  renderer.render(scene, camera);
 }
 
 function shareGalaxy() { if (navigator.share) navigator.share({ title: 'Surya AI Tech - Galaxy', text: 'Explore our 3D Galaxy Business Card!', url: window.location.href }); }
