@@ -47,20 +47,17 @@
     width: 100%;
     height: 100%;
     position: relative;
-    transform-style: preserve-3d;
-    transition: transform 0.7s cubic-bezier(0.4, 0.0, 0.2, 1);
+    transition: transform 0.35s ease-in;
   }
 
-  .card-3d.flipped {
-    transform: rotateY(180deg);
+  .card-3d.flipping {
+    transform: scaleX(0);
   }
 
   .card-face {
     position: absolute;
     width: 100%;
     height: 100%;
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
     border-radius: 16px;
     overflow: hidden;
     box-shadow:
@@ -69,9 +66,10 @@
       0 0 40px rgba(124,58,237,0.06);
   }
 
-  .card-back-face {
-    transform: rotateY(180deg);
-  }
+  .card-front-face { display: block; }
+  .card-back-face { display: none; }
+  .card-3d.show-back .card-front-face { display: none; }
+  .card-3d.show-back .card-back-face { display: block; }
 
   /* ============ HOLOGRAPHIC OVERLAY ============ */
   .holo-layer {
@@ -322,7 +320,7 @@
   <div class="card-3d" id="card3d">
 
     <!-- FRONT -->
-    <div class="card-face">
+    <div class="card-face card-front-face">
 
       <div class="front-inner">
         <div class="stars"></div>
@@ -410,9 +408,22 @@
     correctLevel: QRCode.CorrectLevel.M
   });
 
-  // Tap to flip
+  // Tap to flip — scaleX squeeze then swap faces at midpoint
+  var isFlipping = false;
   document.getElementById('cardScene').addEventListener('click', function() {
-    document.getElementById('card3d').classList.toggle('flipped');
+    if (isFlipping) return;
+    isFlipping = true;
+    var card = document.getElementById('card3d');
+
+    // Squeeze to zero
+    card.classList.add('flipping');
+
+    // At midpoint (350ms), swap face and expand back
+    setTimeout(function() {
+      card.classList.toggle('show-back');
+      card.classList.remove('flipping');
+      isFlipping = false;
+    }, 350);
   });
 
   // Holographic mode
@@ -475,8 +486,9 @@
 
   function applyHolo(x, y) {
     var card = document.getElementById('card3d');
-    card.style.transform = (card.classList.contains('flipped') ? 'rotateY(180deg) ' : '') +
-      'rotateY(' + (x * 8) + 'deg) rotateX(' + (-y * 8) + 'deg)';
+    if (!card.classList.contains('flipping')) {
+      card.style.transform = 'rotateY(' + (x * 8) + 'deg) rotateX(' + (-y * 8) + 'deg)';
+    }
 
     var holoX = (x * 25) + '%';
     var holoY = (y * 25) + '%';
