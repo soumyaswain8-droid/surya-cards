@@ -131,8 +131,8 @@ function initGalaxy() {
   // Inner sphere
   sun.add(new THREE.Mesh(new THREE.SphereGeometry(0.25, 32, 32), new THREE.MeshBasicMaterial({ color: 0xFFB800 })));
 
-  // Glow layers (subtle)
-  [{ s: 1.0, o: 0.35, c: 0xFFB800 }, { s: 1.6, o: 0.12, c: 0xff8c00 }, { s: 2.2, o: 0.04, c: 0xff6600 }].forEach(function(g) {
+  // Glow layers
+  [{ s: 1.8, o: 0.5, c: 0xFFB800 }, { s: 3.5, o: 0.2, c: 0xff8c00 }, { s: 5.0, o: 0.08, c: 0xff6600 }].forEach(function(g) {
     var m = new THREE.SpriteMaterial({ map: makeGlow(g.c), transparent: true, opacity: g.o, blending: THREE.AdditiveBlending, depthWrite: false });
     var s = new THREE.Sprite(m); s.scale.set(g.s, g.s, 1); sun.add(s);
   });
@@ -241,139 +241,6 @@ function initGalaxy() {
     scene.add(sLine);
     shootingStars.push(sLine);
   }
-
-  // === LIGHTING (for realistic asteroid surfaces) ===
-  var sunLight = new THREE.PointLight(0xFFB800, 2, 20);
-  sunLight.position.set(0, 0, 0);
-  scene.add(sunLight);
-  scene.add(new THREE.AmbientLight(0x222244, 0.3));
-
-  // === ASTEROIDS WITH FIRE TAILS ===
-  window._asteroids = [];
-
-  var asteroidConfigs = [
-    { size: 0.18, orbit: 3.5, ecc: 0.3, incl: 0.25, speed: 0.10, tailLen: 60 },
-    { size: 0.14, orbit: 5.0, ecc: 0.4, incl: -0.15, speed: 0.07, tailLen: 50 },
-    { size: 0.22, orbit: 4.2, ecc: 0.25, incl: 0.35, speed: 0.06, tailLen: 70 },
-    { size: 0.10, orbit: 6.5, ecc: 0.5, incl: -0.3, speed: 0.12, tailLen: 40 },
-    { size: 0.16, orbit: 2.8, ecc: 0.2, incl: 0.1, speed: 0.14, tailLen: 55 },
-  ];
-
-  asteroidConfigs.forEach(function(cfg) {
-    var asteroid = new THREE.Group();
-
-    // Rocky body — high-detail icosahedron with noise displacement
-    var aGeo = new THREE.IcosahedronGeometry(cfg.size, 2);
-    var vPos = aGeo.attributes.position;
-    var vertColors = new Float32Array(vPos.count * 3);
-
-    for (var vi = 0; vi < vPos.count; vi++) {
-      var vx = vPos.getX(vi), vy = vPos.getY(vi), vz = vPos.getZ(vi);
-      // Fractal-ish noise: multiple octaves of random displacement
-      var noise1 = (Math.sin(vx * 15.7 + vy * 9.3) * Math.cos(vz * 12.1 + vx * 7.8)) * 0.35;
-      var noise2 = (Math.sin(vx * 31.4 + vz * 18.6) * Math.cos(vy * 24.2)) * 0.15;
-      var noise3 = (Math.random() - 0.5) * 0.12;
-      var disp = 1 + noise1 + noise2 + noise3;
-      // Craters: random deep indentations
-      if (Math.random() < 0.08) disp *= 0.6;
-      vPos.setX(vi, vx * disp);
-      vPos.setY(vi, vy * disp);
-      vPos.setZ(vi, vz * disp);
-
-      // Vertex colors: dark gray base with brown/tan variations
-      var shade = 0.15 + Math.random() * 0.25;
-      var brown = Math.random() * 0.12;
-      vertColors[vi * 3]     = shade + brown;
-      vertColors[vi * 3 + 1] = shade + brown * 0.5;
-      vertColors[vi * 3 + 2] = shade * 0.8;
-    }
-    aGeo.setAttribute('color', new THREE.BufferAttribute(vertColors, 3));
-    aGeo.computeVertexNormals();
-
-    var aMat = new THREE.MeshPhongMaterial({
-      vertexColors: true,
-      shininess: 5,
-      specular: 0x111111,
-      flatShading: true
-    });
-    var aBody = new THREE.Mesh(aGeo, aMat);
-    asteroid.add(aBody);
-
-    // Faint hot-side glow (sun-facing)
-    var aGlowMat = new THREE.SpriteMaterial({ map: makeGlow(0xff4400), transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, depthWrite: false });
-    var aGlow = new THREE.Sprite(aGlowMat);
-    aGlow.scale.set(cfg.size * 4, cfg.size * 4, 1);
-    asteroid.add(aGlow);
-
-    // === FIRE TAIL (multi-layer) ===
-    var tailCount = cfg.tailLen;
-
-    // Layer 1: Core fire trail (bright, thin)
-    var corePos = new Float32Array(tailCount * 3);
-    var coreCol = new Float32Array(tailCount * 3);
-    for (var ti = 0; ti < tailCount; ti++) {
-      var fade = 1 - (ti / tailCount);
-      var f2 = fade * fade;
-      if (fade > 0.8) { coreCol[ti*3] = 1; coreCol[ti*3+1] = 0.95; coreCol[ti*3+2] = 0.8; }
-      else if (fade > 0.5) { coreCol[ti*3] = 1; coreCol[ti*3+1] = 0.6 * fade + 0.2; coreCol[ti*3+2] = 0.05; }
-      else if (fade > 0.2) { coreCol[ti*3] = 0.9; coreCol[ti*3+1] = 0.2 * fade; coreCol[ti*3+2] = 0.02; }
-      else { coreCol[ti*3] = 0.4 * fade; coreCol[ti*3+1] = 0.05 * fade; coreCol[ti*3+2] = 0.01; }
-    }
-    var coreGeo = new THREE.BufferGeometry();
-    coreGeo.setAttribute('position', new THREE.BufferAttribute(corePos, 3));
-    coreGeo.setAttribute('color', new THREE.BufferAttribute(coreCol, 3));
-    var coreTail = new THREE.Points(coreGeo, new THREE.PointsMaterial({
-      size: 0.05, map: makeStar(), transparent: true, opacity: 0.85,
-      vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
-    }));
-    scene.add(coreTail);
-
-    // Layer 2: Outer smoke/embers (wider, dimmer, reddish)
-    var smokeCount = Math.floor(tailCount * 0.7);
-    var smokePos = new Float32Array(smokeCount * 3);
-    var smokeCol = new Float32Array(smokeCount * 3);
-    for (var si = 0; si < smokeCount; si++) {
-      var sf = 1 - (si / smokeCount);
-      smokeCol[si*3] = 0.4 * sf; smokeCol[si*3+1] = 0.08 * sf; smokeCol[si*3+2] = 0.02 * sf;
-    }
-    var smokeGeo = new THREE.BufferGeometry();
-    smokeGeo.setAttribute('position', new THREE.BufferAttribute(smokePos, 3));
-    smokeGeo.setAttribute('color', new THREE.BufferAttribute(smokeCol, 3));
-    var smokeTail = new THREE.Points(smokeGeo, new THREE.PointsMaterial({
-      size: 0.12, map: makeStar(), transparent: true, opacity: 0.35,
-      vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
-    }));
-    scene.add(smokeTail);
-
-    // Small debris chunks orbiting the asteroid
-    var debrisCount = 8;
-    var debrisGroup = new THREE.Group();
-    for (var di = 0; di < debrisCount; di++) {
-      var dGeo = new THREE.IcosahedronGeometry(0.01 + Math.random() * 0.02, 0);
-      var dMat = new THREE.MeshPhongMaterial({ color: new THREE.Color().setHSL(0.07, 0.3, 0.2 + Math.random() * 0.1), flatShading: true });
-      var dMesh = new THREE.Mesh(dGeo, dMat);
-      dMesh.userData = { angle: Math.random() * Math.PI * 2, radius: cfg.size * 1.5 + Math.random() * cfg.size, speed: 1 + Math.random() * 2, yOff: (Math.random() - 0.5) * cfg.size };
-      debrisGroup.add(dMesh);
-    }
-    asteroid.add(debrisGroup);
-
-    asteroid.userData = {
-      orbitRadius: cfg.orbit,
-      eccentricity: cfg.ecc,
-      inclination: cfg.incl,
-      speed: cfg.speed,
-      phase: Math.random() * Math.PI * 2,
-      coreTail: coreTail,
-      smokeTail: smokeTail,
-      tailCount: tailCount,
-      smokeCount: smokeCount,
-      debris: debrisGroup,
-      rotSpeed: { x: 0.005 + Math.random() * 0.015, y: 0.008 + Math.random() * 0.02, z: 0.003 + Math.random() * 0.01 }
-    };
-
-    scene.add(asteroid);
-    window._asteroids.push(asteroid);
-  });
 
   // === BACKGROUND STARS ===
   var bgPos = new Float32Array(800 * 3);
@@ -567,54 +434,6 @@ function animate() {
   planets.forEach(function(p) {
     var a = t * p.userData.speed + p.userData.offset;
     p.position.set(Math.cos(a) * p.userData.radius, Math.sin(a * 2) * 0.04, Math.sin(a) * p.userData.radius);
-  });
-
-  // Asteroids with fire tails
-  if (window._asteroids) window._asteroids.forEach(function(ast) {
-    var d = ast.userData;
-    var angle = t * d.speed + d.phase;
-    var r = d.orbitRadius * (1 - d.eccentricity * Math.cos(angle));
-    var x = Math.cos(angle) * r;
-    var z = Math.sin(angle) * r;
-    var y = Math.sin(angle) * d.inclination * r * 0.3;
-    ast.position.set(x, y, z);
-
-    // Tumble the rock
-    ast.children[0].rotation.x += d.rotSpeed.x;
-    ast.children[0].rotation.y += d.rotSpeed.y;
-    ast.children[0].rotation.z += d.rotSpeed.z;
-
-    // Debris orbiting the asteroid
-    if (d.debris) d.debris.children.forEach(function(db) {
-      var da = t * db.userData.speed + db.userData.angle;
-      db.position.set(
-        Math.cos(da) * db.userData.radius,
-        db.userData.yOff + Math.sin(da * 1.5) * 0.01,
-        Math.sin(da) * db.userData.radius
-      );
-    });
-
-    // Core fire trail — shift positions back, add head
-    var cp = d.coreTail.geometry.attributes.position.array;
-    for (var ti = d.tailCount - 1; ti > 0; ti--) {
-      cp[ti*3]   = cp[(ti-1)*3]   + (Math.random()-0.5)*0.008;
-      cp[ti*3+1] = cp[(ti-1)*3+1] + (Math.random()-0.5)*0.008 + 0.002;
-      cp[ti*3+2] = cp[(ti-1)*3+2] + (Math.random()-0.5)*0.008;
-    }
-    cp[0] = x; cp[1] = y; cp[2] = z;
-    d.coreTail.geometry.attributes.position.needsUpdate = true;
-
-    // Smoke trail — wider scatter, trailing behind
-    var sp = d.smokeTail.geometry.attributes.position.array;
-    for (var si = d.smokeCount - 1; si > 0; si--) {
-      sp[si*3]   = sp[(si-1)*3]   + (Math.random()-0.5)*0.025;
-      sp[si*3+1] = sp[(si-1)*3+1] + (Math.random()-0.5)*0.02 + 0.004;
-      sp[si*3+2] = sp[(si-1)*3+2] + (Math.random()-0.5)*0.025;
-    }
-    sp[0] = x + (Math.random()-0.5)*0.03;
-    sp[1] = y + (Math.random()-0.5)*0.03;
-    sp[2] = z + (Math.random()-0.5)*0.03;
-    d.smokeTail.geometry.attributes.position.needsUpdate = true;
   });
 
   // Nebula drift
