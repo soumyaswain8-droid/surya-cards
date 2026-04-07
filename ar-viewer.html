@@ -87,12 +87,12 @@ var people = {
 var currentPerson = 'k';
 
 var textLayout = {
-  name:     { pos: [3.8, 1.4, -1.8],  scale: 1.8, color: '#ffffff', glow: '#FFB800' },
-  title:    { pos: [-3.2, -0.7, 2.8],  scale: 1.0, color: '#00c8ff', glow: '#00c8ff' },
-  company:  { pos: [0, 2.6, 0],        scale: 1.3, color: '#FFB800', glow: '#FFB800' },
-  email:    { pos: [-2.2, 1.0, -3.8],  scale: 0.7, color: '#c084fc', glow: '#a855f7' },
-  linkedin: { pos: [2.8, -1.2, 3.2],   scale: 0.6, color: '#38bdf8', glow: '#0077b5' },
-  telegram: { pos: [-4.2, 0.4, -1.2],  scale: 0.6, color: '#38bdf8', glow: '#26a5e4' }
+  name:     { pos: [5.0, 2.0, -2.5],   scale: 2.0, color: '#ffffff', glow: '#FFB800' },
+  title:    { pos: [-4.5, -1.2, 3.5],   scale: 1.1, color: '#ffffff', glow: '#00c8ff' },
+  company:  { pos: [0, 3.5, -1.0],      scale: 1.4, color: '#FFD700', glow: '#FFB800' },
+  email:    { pos: [-3.5, 1.5, -5.0],   scale: 0.8, color: '#e0e0e0', glow: '#a855f7' },
+  linkedin: { pos: [4.0, -1.8, 4.5],    scale: 0.7, color: '#e0e0e0', glow: '#0077b5' },
+  telegram: { pos: [-5.5, 0.6, -2.0],   scale: 0.7, color: '#e0e0e0', glow: '#26a5e4' }
 };
 
 function launch(withCamera) {
@@ -129,7 +129,7 @@ function initGalaxy() {
 
   // BLOOM post-processing
   var renderPass = new THREE.RenderPass(scene, camera);
-  bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.8, 0.6, 0.3);
+  bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.4, 0.5, 0.5);
   composer = new THREE.EffectComposer(renderer);
   composer.addPass(renderPass);
   composer.addPass(bloomPass);
@@ -333,29 +333,52 @@ function makeNebula(color) {
 function makeTextSprite(text, fontSize, color, glowHex) {
   var canvas = document.createElement('canvas');
   var ctx = canvas.getContext('2d');
-  var dpr = 2;
+  var dpr = 3;
   ctx.font = 'bold ' + (fontSize * dpr) + 'px Orbitron, sans-serif';
-  var w = ctx.measureText(text).width + 40 * dpr;
-  var h = (fontSize * dpr) + 30 * dpr;
+  var w = ctx.measureText(text).width + 60 * dpr;
+  var h = (fontSize * dpr) + 40 * dpr;
   canvas.width = w; canvas.height = h;
 
+  // Dark backdrop pill for readability
+  var pillPad = 12 * dpr;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+  var rr = 8 * dpr;
+  var px = pillPad, py = pillPad, pw = w - pillPad * 2, ph = h - pillPad * 2;
+  ctx.beginPath();
+  ctx.moveTo(px + rr, py); ctx.lineTo(px + pw - rr, py);
+  ctx.quadraticCurveTo(px + pw, py, px + pw, py + rr);
+  ctx.lineTo(px + pw, py + ph - rr);
+  ctx.quadraticCurveTo(px + pw, py + ph, px + pw - rr, py + ph);
+  ctx.lineTo(px + rr, py + ph);
+  ctx.quadraticCurveTo(px, py + ph, px, py + ph - rr);
+  ctx.lineTo(px, py + rr);
+  ctx.quadraticCurveTo(px, py, px + rr, py);
+  ctx.closePath();
+  ctx.fill();
+
+  // Subtle border glow
+  ctx.strokeStyle = (glowHex || color) + '55';
+  ctx.lineWidth = 1.5 * dpr;
+  ctx.stroke();
+
+  // Text with glow
   ctx.shadowColor = glowHex || color;
-  ctx.shadowBlur = 20 * dpr;
+  ctx.shadowBlur = 12 * dpr;
   ctx.fillStyle = color;
   ctx.font = 'bold ' + (fontSize * dpr) + 'px Orbitron, sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(text, w/2, h/2);
-  ctx.shadowBlur = 8 * dpr;
-  ctx.fillText(text, w/2, h/2);
+  ctx.fillText(text, w / 2, h / 2);
+
+  // Crisp pass
   ctx.shadowBlur = 0;
-  ctx.fillText(text, w/2, h/2);
+  ctx.fillText(text, w / 2, h / 2);
 
   var tex = new THREE.CanvasTexture(canvas);
   tex.minFilter = THREE.LinearFilter;
-  var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+  var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, blending: THREE.NormalBlending, depthWrite: false });
   var sprite = new THREE.Sprite(mat);
   var aspect = w / h;
-  sprite.scale.set(aspect * 0.5, 0.5, 1);
+  sprite.scale.set(aspect * 0.55, 0.55, 1);
   return sprite;
 }
 
@@ -496,7 +519,7 @@ function animate() {
 
   // Bloom + AR transparency
   renderer.setClearColor(0x000000, arMode ? 0 : 1);
-  bloomPass.strength = arMode ? 2.2 : 1.6;
+  bloomPass.strength = arMode ? 1.8 : 1.4;
 
   composer.render();
 }
