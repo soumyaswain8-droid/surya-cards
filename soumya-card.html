@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Soumya | Surya AI">
+<meta name="theme-color" content="#020012">
+<title>Soumya Swain | Surya AI Tech</title>
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%23FFB800'/></svg>">
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Exo+2:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #020012;
+    font-family: 'Rajdhani', sans-serif;
+    touch-action: manipulation;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom);
+    background-image:
+      radial-gradient(ellipse at 30% 20%, rgba(0,200,255,0.03) 0%, transparent 50%),
+      radial-gradient(ellipse at 70% 80%, rgba(139,92,246,0.03) 0%, transparent 50%);
+  }
+
+  /* ============ CARD CONTAINER (3D flip) ============ */
+  .card-scene {
+    width: 340px;
+    height: 196px;
+    perspective: 1200px;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .card-3d {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.7s cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+
+  .card-3d.flipped {
+    transform: rotateY(180deg);
+  }
+
+  .card-face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow:
+      0 0 0 2px rgba(255,184,0,0.3),
+      0 0 20px rgba(255,184,0,0.1),
+      0 0 40px rgba(124,58,237,0.06);
+  }
+
+  .card-back-face {
+    transform: rotateY(180deg);
+  }
+
+  /* ============ HOLOGRAPHIC OVERLAY ============ */
+  .holo-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    pointer-events: none;
+    border-radius: 16px;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+
+  .holo-layer.active { opacity: 1; }
+
+  .holo-rainbow {
+    position: absolute;
+    inset: -50%;
+    background: conic-gradient(
+      from 0deg,
+      rgba(255,0,0,0.06),
+      rgba(255,165,0,0.06),
+      rgba(255,255,0,0.06),
+      rgba(0,255,0,0.06),
+      rgba(0,200,255,0.06),
+      rgba(0,0,255,0.06),
+      rgba(128,0,255,0.06),
+      rgba(255,0,128,0.06),
+      rgba(255,0,0,0.06)
+    );
+    transform: translate(var(--holo-x, 0%), var(--holo-y, 0%));
+    transition: transform 0.1s linear;
+  }
+
+  .holo-light {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);
+    transform: translate(var(--light-x, 50%), var(--light-y, 50%));
+    transition: transform 0.1s linear;
+    pointer-events: none;
+  }
+
+  .holo-sheen {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      var(--sheen-angle, 135deg),
+      transparent 30%,
+      rgba(255,255,255,0.04) 45%,
+      rgba(255,255,255,0.08) 50%,
+      rgba(255,255,255,0.04) 55%,
+      transparent 70%
+    );
+  }
+
+  /* ============ NEBULA BORDER ============ */
+  .neb-border {
+    position: absolute;
+    inset: -2px;
+    border-radius: 18px;
+    background: conic-gradient(from 45deg, #FFB800, #ff6d00, #e65100, #7c3aed, #4f46e5, #00c8ff, #FFB800);
+    z-index: -1;
+    animation: borderRotate 6s linear infinite;
+    background-size: 100% 100%;
+  }
+
+  @keyframes borderRotate {
+    0% { filter: hue-rotate(0deg); }
+    100% { filter: hue-rotate(0deg); }
+  }
+
+  .neb-shadow {
+    position: absolute;
+    inset: -2px;
+    border-radius: 18px;
+    z-index: -2;
+    box-shadow: 0 0 30px rgba(255,184,0,0.12), 0 0 60px rgba(124,58,237,0.06);
+  }
+
+  /* ============ STAR FIELD ============ */
+  .stars { position: absolute; inset: 0; }
+  .stars::before {
+    content: ''; position: absolute; inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 10% 15%, rgba(255,255,255,0.7), transparent),
+      radial-gradient(1px 1px at 25% 60%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1px 1px at 40% 25%, rgba(255,255,255,0.6), transparent),
+      radial-gradient(1px 1px at 55% 80%, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1px 1px at 70% 10%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1px 1px at 85% 45%, rgba(255,255,255,0.6), transparent),
+      radial-gradient(1px 1px at 15% 85%, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1px 1px at 90% 70%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1px 1px at 5% 40%, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1px 1px at 35% 90%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1px 1px at 75% 30%, rgba(255,255,255,0.6), transparent),
+      radial-gradient(1px 1px at 60% 5%, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1.5px 1.5px at 30% 20%, rgba(255,255,255,0.8), transparent),
+      radial-gradient(1.5px 1.5px at 65% 55%, rgba(255,255,255,0.7), transparent),
+      radial-gradient(1.5px 1.5px at 95% 25%, rgba(255,255,255,0.6), transparent);
+  }
+  .stars::after {
+    content: ''; position: absolute; inset: 0;
+    background-image:
+      radial-gradient(0.8px 0.8px at 12% 48%, rgba(255,255,255,0.3), transparent),
+      radial-gradient(0.8px 0.8px at 38% 12%, rgba(255,255,255,0.3), transparent),
+      radial-gradient(0.8px 0.8px at 68% 82%, rgba(255,255,255,0.3), transparent),
+      radial-gradient(0.8px 0.8px at 92% 62%, rgba(255,255,255,0.3), transparent),
+      radial-gradient(0.8px 0.8px at 48% 78%, rgba(255,255,255,0.25), transparent);
+    animation: twinkle 4s ease-in-out infinite alternate;
+  }
+
+  @keyframes twinkle { 0% { opacity: 0.5; } 100% { opacity: 1; } }
+
+  /* ============ FRONT CARD ============ */
+  .front-inner {
+    width: 100%; height: 100%;
+    background: #020012;
+    background-image:
+      radial-gradient(ellipse at 65% 45%, rgba(255,184,0,0.06) 0%, transparent 40%),
+      radial-gradient(ellipse at 30% 70%, rgba(79,70,229,0.05) 0%, transparent 40%),
+      radial-gradient(ellipse at 80% 80%, rgba(139,92,246,0.04) 0%, transparent 35%);
+    position: relative;
+  }
+
+  .nebula-cloud { position: absolute; border-radius: 50%; filter: blur(25px); z-index: 1; }
+  .nc-1 { width: 140px; height: 80px; background: radial-gradient(ellipse, rgba(99,102,241,0.12) 0%, transparent 70%); top: -10px; left: -20px; }
+  .nc-2 { width: 120px; height: 60px; background: radial-gradient(ellipse, rgba(168,85,247,0.08) 0%, transparent 70%); bottom: 10px; right: 20px; }
+
+  /* Sun */
+  .sun-universe { position: absolute; right: 55px; top: 50%; transform: translateY(-50%); width: 80px; height: 80px; z-index: 2; }
+  .sun-core { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle, #fff 0%, #FFD700 30%, #FFB800 60%, #ff8c00 100%); box-shadow: 0 0 10px rgba(255,184,0,0.8), 0 0 25px rgba(255,184,0,0.4), 0 0 50px rgba(255,184,0,0.2); z-index: 5; }
+  .corona { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 36px; height: 36px; border-radius: 50%; background: radial-gradient(circle, rgba(255,215,0,0.15) 0%, transparent 70%); z-index: 4; animation: coronaPulse 3s ease-in-out infinite; }
+  @keyframes coronaPulse { 0%,100% { transform: translate(-50%,-50%) scale(1); opacity: 0.8; } 50% { transform: translate(-50%,-50%) scale(1.3); opacity: 0.4; } }
+
+  .orbit { position: absolute; top: 50%; left: 50%; border: 1px solid; border-radius: 50%; z-index: 3; }
+  .orbit-1 { width: 44px; height: 44px; margin: -22px 0 0 -22px; border-color: rgba(255,184,0,0.18); animation: spin 12s linear infinite; }
+  .orbit-2 { width: 62px; height: 62px; margin: -31px 0 0 -31px; border-color: rgba(0,200,255,0.12); animation: spin 18s linear infinite reverse; }
+  .orbit-3 { width: 80px; height: 80px; margin: -40px 0 0 -40px; border-color: rgba(139,92,246,0.08); animation: spin 25s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .planet { position: absolute; border-radius: 50%; z-index: 6; }
+  .planet-1 { width: 4px; height: 4px; background: #00c8ff; box-shadow: 0 0 4px rgba(0,200,255,0.6); top: 50%; left: 50%; margin: -22px 0 0 -2px; animation: spin 12s linear infinite; transform-origin: 2px 22px; }
+  .planet-2 { width: 3px; height: 3px; background: #a855f7; box-shadow: 0 0 4px rgba(168,85,247,0.5); top: 50%; left: 50%; margin: -31px 0 0 -1.5px; animation: spin 18s linear infinite reverse; transform-origin: 1.5px 31px; }
+  .planet-3 { width: 3px; height: 3px; background: #34d399; box-shadow: 0 0 4px rgba(52,211,153,0.5); top: 50%; left: 50%; margin: -1.5px 0 0 -40px; animation: spin 25s linear infinite; transform-origin: 40px 1.5px; }
+
+  .content { position: relative; z-index: 10; padding: 20px 24px 18px; height: 100%; display: flex; flex-direction: column; justify-content: space-between; }
+  .brand-row { display: flex; align-items: center; gap: 8px; }
+  .mini-sun { width: 20px; height: 20px; border-radius: 50%; background: radial-gradient(circle, #FFD700 20%, #FFB800 50%, rgba(255,184,0,0) 100%); box-shadow: 0 0 8px rgba(255,184,0,0.5); flex-shrink: 0; }
+  .co-name { font-family: 'Orbitron', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 3px; color: #fff; background: linear-gradient(90deg, #FFB800, #ffd700, #fff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .co-tag { font-family: 'JetBrains Mono', monospace; font-size: 7px; letter-spacing: 3px; color: rgba(255,184,0,0.4); margin-left: auto; text-transform: uppercase; }
+  .id-block { max-width: 55%; position: relative; }
+  .id-block::before { content: ''; position: absolute; top: -8px; left: 0; width: 35px; height: 1px; background: linear-gradient(90deg, #FFB800, transparent); }
+  .full-name { font-family: 'Exo 2', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: 1px; color: #fff; }
+  .title-text { font-family: 'Rajdhani', sans-serif; font-size: 10px; font-weight: 500; letter-spacing: 3px; text-transform: uppercase; margin-top: 2px; background: linear-gradient(90deg, #FFB800, #00c8ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .edge-line { position: absolute; left: 0; right: 0; height: 2px; z-index: 20; }
+  .edge-bottom { bottom: 0; background: linear-gradient(90deg, transparent, #00c8ff, #7c3aed, #FFB800, transparent); }
+  .edge-top { top: 0; background: linear-gradient(90deg, transparent, #FFB800, #7c3aed, #00c8ff, transparent); }
+
+  /* ============ BACK CARD ============ */
+  .back-inner {
+    width: 100%; height: 100%;
+    background: #020012;
+    background-image: radial-gradient(ellipse at 50% 50%, rgba(255,184,0,0.03) 0%, transparent 50%);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+
+  .back-layout { position: relative; z-index: 10; display: flex; align-items: center; gap: 20px; }
+  .dual-qr { display: flex; gap: 16px; align-items: center; }
+  .qr-col { text-align: center; }
+  .qr-title { font-family: 'JetBrains Mono', monospace; font-size: 6px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; opacity: 0.7; color: #fff; }
+  .qr-box { background: #fff; padding: 5px; border-radius: 5px; }
+  .qr-box canvas, .qr-box img { display: block; width: 68px !important; height: 68px !important; }
+  .qr-divider { width: 1px; height: 60px; background: linear-gradient(180deg, transparent, rgba(255,255,255,0.1), transparent); }
+  .back-brand { text-align: center; }
+  .back-brand .mini-sun { width: 14px; height: 14px; margin: 0 auto 5px; }
+  .back-brand .b-name { font-family: 'Orbitron', sans-serif; font-size: 8px; letter-spacing: 2px; color: rgba(255,255,255,0.25); }
+  .back-brand .b-email { font-family: 'JetBrains Mono', monospace; font-size: 7px; color: rgba(255,255,255,0.2); margin-top: 3px; }
+
+  /* ============ UI CONTROLS ============ */
+  .controls {
+    margin-top: 30px;
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+  }
+
+  .ctrl-btn {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 10px 20px;
+    border: 1px solid rgba(255,184,0,0.2);
+    background: rgba(255,184,0,0.04);
+    color: rgba(255,255,255,0.5);
+    border-radius: 25px;
+    cursor: pointer;
+    transition: all 0.3s;
+    -webkit-appearance: none;
+  }
+
+  .ctrl-btn:active {
+    background: rgba(255,184,0,0.15);
+    color: #FFB800;
+    border-color: rgba(255,184,0,0.5);
+  }
+
+  .ctrl-btn.holo-btn.active {
+    background: rgba(255,184,0,0.12);
+    color: #FFB800;
+    border-color: rgba(255,184,0,0.4);
+  }
+
+  .hint {
+    margin-top: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 2px;
+    color: #333;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .flip-hint {
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 2px;
+    color: #333;
+    text-transform: uppercase;
+    white-space: nowrap;
+    animation: fadeHint 3s ease-in-out infinite;
+  }
+
+  @keyframes fadeHint { 0%,100% { opacity: 0.3; } 50% { opacity: 0.7; } }
+</style>
+</head>
+<body>
+
+<div class="card-scene" id="cardScene">
+  <div class="card-3d" id="card3d">
+
+    <!-- FRONT -->
+    <div class="card-face">
+
+      <div class="front-inner">
+        <div class="stars"></div>
+        <div class="nebula-cloud nc-1"></div>
+        <div class="nebula-cloud nc-2"></div>
+        <div class="sun-universe">
+          <div class="sun-core"></div><div class="corona"></div>
+          <div class="orbit orbit-1"></div><div class="orbit orbit-2"></div><div class="orbit orbit-3"></div>
+          <div class="planet planet-1"></div><div class="planet planet-2"></div><div class="planet planet-3"></div>
+        </div>
+        <div class="edge-line edge-bottom"></div>
+        <div class="content">
+          <div class="brand-row">
+            <div class="mini-sun"></div>
+            <div class="co-name">SURYA AI TECH</div>
+            <div class="co-tag">// BUILDING THE FUTURE</div>
+          </div>
+          <div class="id-block">
+            <div class="full-name">SOUMYA SWAIN</div>
+            <div class="title-text">Co-Founder &amp; Founding Member</div>
+          </div>
+        </div>
+        <div class="holo-layer" id="holoFront">
+          <div class="holo-rainbow"></div>
+          <div class="holo-sheen"></div>
+          <div class="holo-light"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BACK -->
+    <div class="card-face card-back-face">
+
+      <div class="back-inner">
+        <div class="stars"></div>
+        <div class="edge-line edge-top"></div>
+        <div class="edge-line edge-bottom"></div>
+        <div class="back-layout">
+          <div class="dual-qr">
+            <div class="qr-col">
+              <div class="qr-title" style="color:#00c8ff;">LinkedIn</div>
+              <div class="qr-box"><div id="qr-li"></div></div>
+            </div>
+            <div class="qr-divider"></div>
+            <div class="qr-col">
+              <div class="qr-title" style="color:#a855f7;">Telegram</div>
+              <div class="qr-box"><div id="qr-tg"></div></div>
+            </div>
+          </div>
+          <div class="back-brand">
+            <div class="mini-sun"></div>
+            <div class="b-name">SURYA AI</div>
+            <div class="b-email">sowmya@devpilot.co.in</div>
+          </div>
+        </div>
+        <div class="holo-layer" id="holoBack">
+          <div class="holo-rainbow"></div>
+          <div class="holo-sheen"></div>
+          <div class="holo-light"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="flip-hint">Tap to flip</div>
+</div>
+
+<div class="controls">
+  <button class="ctrl-btn holo-btn" id="holoBtn" onclick="toggleHolo()">Holographic</button>
+  <button class="ctrl-btn" onclick="shareCard()">Share</button>
+  <button class="ctrl-btn" onclick="saveContact()">Save Contact</button>
+</div>
+
+<div class="hint" id="holoHint"></div>
+
+<script>
+  // QR codes
+  new QRCode(document.getElementById('qr-li'), {
+    text: 'https://www.linkedin.com/in/soumya-swain-116208107/',
+    width: 76, height: 76, colorDark: '#000', colorLight: '#fff',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+  new QRCode(document.getElementById('qr-tg'), {
+    text: 'https://t.me/soumyaswian',
+    width: 76, height: 76, colorDark: '#000', colorLight: '#fff',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+
+  // Tap to flip
+  document.getElementById('cardScene').addEventListener('click', function() {
+    document.getElementById('card3d').classList.toggle('flipped');
+  });
+
+  // Holographic mode
+  var holoActive = false;
+
+  function toggleHolo() {
+    holoActive = !holoActive;
+    var btn = document.getElementById('holoBtn');
+    var layers = document.querySelectorAll('.holo-layer');
+
+    if (holoActive) {
+      btn.classList.add('active');
+      layers.forEach(function(l) { l.classList.add('active'); });
+      enableGyroscope();
+      document.getElementById('holoHint').textContent = 'Tilt your phone to see the effect';
+    } else {
+      btn.classList.remove('active');
+      layers.forEach(function(l) { l.classList.remove('active'); });
+      document.getElementById('holoHint').textContent = '';
+    }
+  }
+
+  function enableGyroscope() {
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().then(function(permission) {
+        if (permission === 'granted') {
+          window.addEventListener('deviceorientation', handleTilt);
+        }
+      }).catch(console.error);
+    } else if ('DeviceOrientationEvent' in window) {
+      window.addEventListener('deviceorientation', handleTilt);
+    }
+
+    // Fallback: mouse/touch move
+    document.addEventListener('mousemove', handleMouse);
+    document.addEventListener('touchmove', handleTouch, { passive: true });
+  }
+
+  function handleTilt(e) {
+    if (!holoActive) return;
+    var beta = Math.max(-30, Math.min(30, e.beta || 0));
+    var gamma = Math.max(-30, Math.min(30, e.gamma || 0));
+    applyHolo(gamma / 30, beta / 30);
+  }
+
+  function handleMouse(e) {
+    if (!holoActive) return;
+    var x = (e.clientX / window.innerWidth - 0.5) * 2;
+    var y = (e.clientY / window.innerHeight - 0.5) * 2;
+    applyHolo(x, y);
+  }
+
+  function handleTouch(e) {
+    if (!holoActive || !e.touches[0]) return;
+    var x = (e.touches[0].clientX / window.innerWidth - 0.5) * 2;
+    var y = (e.touches[0].clientY / window.innerHeight - 0.5) * 2;
+    applyHolo(x, y);
+  }
+
+  function applyHolo(x, y) {
+    var card = document.getElementById('card3d');
+    card.style.transform = (card.classList.contains('flipped') ? 'rotateY(180deg) ' : '') +
+      'rotateY(' + (x * 8) + 'deg) rotateX(' + (-y * 8) + 'deg)';
+
+    var holoX = (x * 25) + '%';
+    var holoY = (y * 25) + '%';
+    var lightX = (50 + x * 40) + '%';
+    var lightY = (50 + y * 40) + '%';
+    var sheenAngle = (135 + x * 40) + 'deg';
+
+    document.querySelectorAll('.holo-layer').forEach(function(layer) {
+      layer.style.setProperty('--holo-x', holoX);
+      layer.style.setProperty('--holo-y', holoY);
+      layer.style.setProperty('--light-x', lightX);
+      layer.style.setProperty('--light-y', lightY);
+      layer.style.setProperty('--sheen-angle', sheenAngle);
+    });
+  }
+
+  // Share via Web Share API (AirDrop on iOS)
+  function shareCard() {
+    if (navigator.share) {
+      navigator.share({
+        title: 'Soumya Swain | Surya AI Tech',
+        text: 'Co-Founder & Founding Member at Surya AI Tech. Connect with me!',
+        url: window.location.href
+      }).catch(function(){});
+    } else {
+      // Fallback: copy URL
+      navigator.clipboard.writeText(window.location.href);
+      document.getElementById('holoHint').textContent = 'Link copied to clipboard!';
+      setTimeout(function() { document.getElementById('holoHint').textContent = ''; }, 2000);
+    }
+  }
+
+  // Save contact (download vCard)
+  function saveContact() {
+    var vcard = [
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      'N:Swain;Soumya',
+      'FN:Soumya Swain',
+      'ORG:Surya AI Tech',
+      'TITLE:Co-Founder & Founding Member',
+      'EMAIL:sowmya@devpilot.co.in',
+      'item1.URL:https://www.linkedin.com/in/soumya-swain-116208107/',
+      'item1.X-ABLabel:LinkedIn',
+      'item2.URL:https://t.me/soumyaswian',
+      'item2.X-ABLabel:Telegram',
+      'END:VCARD'
+    ].join('\r\n');
+
+    var blob = new Blob([vcard], { type: 'text/vcard' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'Soumya_Swain_SuryaAI.vcf';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+</script>
+</body>
+</html>
