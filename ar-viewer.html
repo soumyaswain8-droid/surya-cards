@@ -120,64 +120,93 @@ function initGalaxy() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   document.body.appendChild(renderer.domElement);
 
-  // === SUN (multi-layer) ===
+  // === SUN (clean, subtle glow) ===
   sun = new THREE.Group();
   scene.add(sun);
-
-  // Core
-  var coreGeo = new THREE.SphereGeometry(0.12, 32, 32);
-  sun.add(new THREE.Mesh(coreGeo, new THREE.MeshBasicMaterial({ color: 0xffffff })));
-
-  // Inner sphere
-  sun.add(new THREE.Mesh(new THREE.SphereGeometry(0.25, 32, 32), new THREE.MeshBasicMaterial({ color: 0xFFB800 })));
-
-  // Glow layers
-  [{ s: 1.8, o: 0.5, c: 0xFFB800 }, { s: 3.5, o: 0.2, c: 0xff8c00 }, { s: 5.0, o: 0.08, c: 0xff6600 }].forEach(function(g) {
+  sun.add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 32, 32), new THREE.MeshBasicMaterial({ color: 0xffffff })));
+  sun.add(new THREE.Mesh(new THREE.SphereGeometry(0.22, 32, 32), new THREE.MeshBasicMaterial({ color: 0xFFB800 })));
+  // Subtle warm halo only
+  [{ s: 1.2, o: 0.3, c: 0xFFB800 }, { s: 2.0, o: 0.08, c: 0xff8c00 }].forEach(function(g) {
     var m = new THREE.SpriteMaterial({ map: makeGlow(g.c), transparent: true, opacity: g.o, blending: THREE.AdditiveBlending, depthWrite: false });
-    var s = new THREE.Sprite(m); s.scale.set(g.s, g.s, 1); sun.add(s);
+    var sp = new THREE.Sprite(m); sp.scale.set(g.s, g.s, 1); sun.add(sp);
   });
 
-  // === GALAXY SPIRAL (6000 particles) ===
-  var count = 6000;
+  // === GALAXY — 10000 particles, logarithmic spiral, natural density ===
+  var count = 10000;
   var pos = new Float32Array(count * 3);
   var col = new Float32Array(count * 3);
-  var sizes = new Float32Array(count);
+
+  // Noise function for natural scatter
+  function noise(x, y) { return Math.sin(x * 12.9898 + y * 78.233) * 0.5 + 0.5; }
 
   for (var i = 0; i < count; i++) {
     var arm = Math.floor(Math.random() * 4);
     var armAngle = (arm / 4) * Math.PI * 2;
-    var dist = Math.pow(Math.random(), 0.6) * 7.5;
-    var spiral = dist * 0.65 + armAngle;
-    var scatter = (Math.random() - 0.5) * (0.15 + dist * 0.08);
-    var scatterY = (Math.random() - 0.5) * 0.2 * Math.max(0, 1 - dist / 8);
 
-    pos[i*3]   = Math.cos(spiral) * dist + scatter;
+    // Logarithmic spiral — like real galaxies
+    var rawDist = Math.random();
+    var dist = Math.pow(rawDist, 0.45) * 8;
+    var spiralTightness = 0.55;
+    var spiral = dist * spiralTightness + armAngle;
+
+    // Scatter increases with distance (natural arm widening)
+    var armWidth = 0.08 + dist * 0.06;
+    var scatter = (Math.random() - 0.5) * armWidth * 2;
+
+    // Some stars between arms (inter-arm population, dimmer)
+    var isInterArm = Math.random() < 0.15;
+    if (isInterArm) {
+      spiral += (Math.random() - 0.5) * 1.2;
+      scatter *= 2.5;
+    }
+
+    // Disk thickness — thinner at edges, bulge at core
+    var diskThickness = dist < 0.8 ? 0.35 : 0.12 * (1 - dist / 10);
+    var scatterY = (Math.random() - 0.5) * diskThickness;
+    // Central bulge — extra height near core
+    if (dist < 1.5) scatterY *= (1 + (1.5 - dist) * 0.8);
+
+    pos[i*3]   = Math.cos(spiral) * dist + scatter * Math.cos(spiral + 1.57);
     pos[i*3+1] = scatterY;
-    pos[i*3+2] = Math.sin(spiral) * dist + scatter;
+    pos[i*3+2] = Math.sin(spiral) * dist + scatter * Math.sin(spiral + 1.57);
 
-    var t = dist / 7.5;
-    var bright = Math.random();
+    // Natural galaxy colors — based on stellar population
+    var t = dist / 8;
+    var rnd = Math.random();
 
-    if (bright > 0.92) {
-      // Bright blue-white stars
-      col[i*3] = 0.8 + Math.random()*0.2; col[i*3+1] = 0.85 + Math.random()*0.15; col[i*3+2] = 1;
-      sizes[i] = 3 + Math.random() * 4;
-    } else if (t < 0.2) {
-      // Hot core — yellow-white
-      col[i*3] = 1; col[i*3+1] = 0.85 + Math.random()*0.15; col[i*3+2] = 0.5 + Math.random()*0.3;
-      sizes[i] = 1.5 + Math.random() * 2;
-    } else if (t < 0.45) {
-      // Mid — blue-cyan
-      col[i*3] = 0.3 + Math.random()*0.2; col[i*3+1] = 0.6 + Math.random()*0.3; col[i*3+2] = 0.9 + Math.random()*0.1;
-      sizes[i] = 1 + Math.random() * 1.5;
-    } else if (t < 0.7) {
-      // Outer — purple-blue
-      col[i*3] = 0.5 + Math.random()*0.2; col[i*3+1] = 0.2 + Math.random()*0.2; col[i*3+2] = 0.7 + Math.random()*0.3;
-      sizes[i] = 0.8 + Math.random() * 1.2;
+    if (isInterArm) {
+      // Inter-arm: dim warm stars
+      col[i*3] = 0.6; col[i*3+1] = 0.45; col[i*3+2] = 0.3;
+    } else if (rnd > 0.95) {
+      // Rare bright blue giants
+      col[i*3] = 0.7; col[i*3+1] = 0.85; col[i*3+2] = 1;
+    } else if (t < 0.15) {
+      // Core bulge — old yellow-orange stars
+      var warmth = 0.8 + Math.random() * 0.2;
+      col[i*3] = warmth; col[i*3+1] = warmth * 0.75; col[i*3+2] = warmth * 0.35;
+    } else if (t < 0.3) {
+      // Inner disk — warm white to yellow
+      col[i*3] = 0.9 + rnd*0.1; col[i*3+1] = 0.8 + rnd*0.15; col[i*3+2] = 0.5 + rnd*0.3;
+    } else if (t < 0.55) {
+      // Mid arms — young blue-white stars
+      col[i*3] = 0.5 + rnd*0.3; col[i*3+1] = 0.65 + rnd*0.25; col[i*3+2] = 0.85 + rnd*0.15;
+    } else if (t < 0.75) {
+      // Outer arms — mix of blue and faint pink (H-II regions)
+      if (rnd > 0.7) {
+        col[i*3] = 0.8; col[i*3+1] = 0.35; col[i*3+2] = 0.5; // pink nebula
+      } else {
+        col[i*3] = 0.35; col[i*3+1] = 0.5; col[i*3+2] = 0.75;
+      }
     } else {
-      // Edge — dim red-purple
-      col[i*3] = 0.4 + Math.random()*0.2; col[i*3+1] = 0.1 + Math.random()*0.15; col[i*3+2] = 0.3 + Math.random()*0.3;
-      sizes[i] = 0.5 + Math.random() * 1;
+      // Far edge — very dim
+      var dim = 0.15 + rnd * 0.15;
+      col[i*3] = dim; col[i*3+1] = dim * 0.8; col[i*3+2] = dim * 1.2;
+    }
+
+    // Density boost near core — make core stars brighter
+    if (dist < 1.0) {
+      var boost = 1 + (1 - dist) * 0.5;
+      col[i*3] *= boost; col[i*3+1] *= boost; col[i*3+2] *= boost;
     }
   }
 
@@ -186,74 +215,147 @@ function initGalaxy() {
   gGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
 
   galaxyParticles = new THREE.Points(gGeo, new THREE.PointsMaterial({
-    size: 0.035, map: makeStar(), transparent: true,
+    size: 0.03, map: makeStar(), transparent: true,
     vertexColors: true, blending: THREE.AdditiveBlending,
     depthWrite: false, sizeAttenuation: true
   }));
   scene.add(galaxyParticles);
 
-  // === NEBULA CLOUDS (colored gas sprites) ===
+  // === CENTRAL BULGE (dense warm core cluster) ===
+  var bulgeCount = 2000;
+  var bPos = new Float32Array(bulgeCount * 3);
+  var bCol = new Float32Array(bulgeCount * 3);
+  for (var bi = 0; bi < bulgeCount; bi++) {
+    var br = Math.pow(Math.random(), 1.5) * 1.2;
+    var bTheta = Math.random() * Math.PI * 2;
+    var bPhi = Math.acos(2 * Math.random() - 1);
+    // Flatten into ellipsoid (wider than tall)
+    bPos[bi*3]   = br * Math.sin(bPhi) * Math.cos(bTheta);
+    bPos[bi*3+1] = br * Math.cos(bPhi) * 0.4;
+    bPos[bi*3+2] = br * Math.sin(bPhi) * Math.sin(bTheta);
+    var bw = 0.7 + Math.random() * 0.3;
+    bCol[bi*3] = bw; bCol[bi*3+1] = bw * 0.7; bCol[bi*3+2] = bw * 0.3;
+  }
+  var bGeo = new THREE.BufferGeometry();
+  bGeo.setAttribute('position', new THREE.BufferAttribute(bPos, 3));
+  bGeo.setAttribute('color', new THREE.BufferAttribute(bCol, 3));
+  scene.add(new THREE.Points(bGeo, new THREE.PointsMaterial({
+    size: 0.02, map: makeStar(), transparent: true, opacity: 0.6,
+    vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+  })));
+
+  // === NEBULA CLOUDS along spiral arms ===
   var nebulaData = [
-    { x: 2.5, y: 0.1, z: 1.5, s: 3.5, c: 0x4f46e5, o: 0.06 },
-    { x: -2.0, y: -0.1, z: -2.5, s: 4.0, c: 0x7c3aed, o: 0.05 },
-    { x: 1.0, y: 0.15, z: -3.0, s: 3.0, c: 0x2563eb, o: 0.04 },
-    { x: -3.5, y: 0.0, z: 1.0, s: 3.5, c: 0x9333ea, o: 0.05 },
-    { x: 0.5, y: 0.05, z: 3.5, s: 2.5, c: 0x6366f1, o: 0.04 },
-    { x: 3.0, y: -0.05, z: -1.0, s: 2.8, c: 0xec4899, o: 0.03 },
-    { x: -1.5, y: 0.1, z: 2.0, s: 2.0, c: 0xFFB800, o: 0.03 },
+    // Along arm paths — positioned where H-II regions would form
+    { x: 2.2, y: 0.05, z: 1.8, s: 2.5, c: 0x4338ca, o: 0.04 },
+    { x: -1.8, y: -0.05, z: -2.8, s: 3.0, c: 0x6d28d9, o: 0.035 },
+    { x: 3.5, y: 0.0, z: -1.5, s: 2.2, c: 0x2563eb, o: 0.03 },
+    { x: -3.2, y: 0.05, z: 1.5, s: 2.8, c: 0x7c3aed, o: 0.035 },
+    { x: 0.8, y: 0.0, z: 3.0, s: 2.0, c: 0x4f46e5, o: 0.03 },
+    { x: -0.5, y: 0.0, z: -3.5, s: 2.5, c: 0x6366f1, o: 0.025 },
+    // Pink H-II star-forming regions
+    { x: 4.0, y: 0.0, z: 2.0, s: 1.5, c: 0xdb2777, o: 0.025 },
+    { x: -2.5, y: 0.0, z: 3.5, s: 1.8, c: 0xbe185d, o: 0.02 },
+    // Warm dust near core
+    { x: 0.8, y: 0.0, z: -0.5, s: 1.5, c: 0xFFB800, o: 0.02 },
+    { x: -0.6, y: 0.0, z: 0.8, s: 1.2, c: 0xff8c00, o: 0.015 },
   ];
 
   nebulaData.forEach(function(n) {
     var mat = new THREE.SpriteMaterial({ map: makeNebula(n.c), transparent: true, opacity: n.o, blending: THREE.AdditiveBlending, depthWrite: false });
     var s = new THREE.Sprite(mat);
     s.position.set(n.x, n.y, n.z);
-    s.scale.set(n.s, n.s * 0.6, 1);
+    s.scale.set(n.s, n.s * 0.5, 1);
     scene.add(s);
     nebulaSprites.push(s);
   });
 
-  // === ORBIT RINGS ===
-  [[1.2, 0xFFB800, 0.12], [2.0, 0x00c8ff, 0.08], [3.2, 0xa855f7, 0.06]].forEach(function(r) {
-    var rGeo = new THREE.RingGeometry(r[0]-0.006, r[0]+0.006, 200);
+  // === DUST LANES (dark absorption between arms) ===
+  var dustCount = 1500;
+  var dPos = new Float32Array(dustCount * 3);
+  var dCol = new Float32Array(dustCount * 3);
+  for (var di = 0; di < dustCount; di++) {
+    var dArm = Math.floor(Math.random() * 4);
+    var dArmAngle = (dArm / 4) * Math.PI * 2 + 0.35; // offset between arms
+    var dDist = 1.0 + Math.pow(Math.random(), 0.5) * 5;
+    var dSpiral = dDist * 0.55 + dArmAngle;
+    var dScatter = (Math.random() - 0.5) * 0.3;
+    dPos[di*3]   = Math.cos(dSpiral) * dDist + dScatter;
+    dPos[di*3+1] = (Math.random() - 0.5) * 0.06;
+    dPos[di*3+2] = Math.sin(dSpiral) * dDist + dScatter;
+    // Very dark reddish-brown — absorbs light
+    dCol[di*3] = 0.12; dCol[di*3+1] = 0.05; dCol[di*3+2] = 0.02;
+  }
+  var dGeo = new THREE.BufferGeometry();
+  dGeo.setAttribute('position', new THREE.BufferAttribute(dPos, 3));
+  dGeo.setAttribute('color', new THREE.BufferAttribute(dCol, 3));
+  scene.add(new THREE.Points(dGeo, new THREE.PointsMaterial({
+    size: 0.08, map: makeStar(), transparent: true, opacity: 0.15,
+    vertexColors: true, blending: THREE.NormalBlending, depthWrite: false, sizeAttenuation: true
+  })));
+
+  // === ORBIT RINGS (thinner, more subtle) ===
+  [[1.3, 0xFFB800, 0.06], [2.2, 0x00c8ff, 0.04], [3.5, 0xa855f7, 0.03]].forEach(function(r) {
+    var rGeo = new THREE.RingGeometry(r[0]-0.004, r[0]+0.004, 256);
     var ring = new THREE.Mesh(rGeo, new THREE.MeshBasicMaterial({ color: r[1], transparent: true, opacity: r[2], side: THREE.DoubleSide }));
     ring.rotation.x = Math.PI * 0.5;
     scene.add(ring);
   });
 
-  // === PLANETS ===
-  [[1.2, 0.07, 0x00c8ff, 0.7, 0.35], [2.0, 0.055, 0xa855f7, 0.45, 0.25], [3.2, 0.08, 0x34d399, 0.25, 0.4]].forEach(function(d) {
+  // === PLANETS (5 with moons) ===
+  var planetData = [
+    [1.3, 0.06, 0x00c8ff, 0.6, 0.2],
+    [2.2, 0.05, 0xa855f7, 0.38, 0.15],
+    [3.5, 0.07, 0x34d399, 0.22, 0.2],
+    [1.7, 0.035, 0xff6b6b, 0.5, 0.12],
+    [2.8, 0.045, 0xfbbf24, 0.3, 0.15]
+  ];
+  planetData.forEach(function(d) {
     var p = new THREE.Mesh(new THREE.SphereGeometry(d[1], 16, 16), new THREE.MeshBasicMaterial({ color: d[2] }));
     p.userData = { radius: d[0], speed: d[3], offset: Math.random() * Math.PI * 2 };
-    // Planet glow
     var gMat = new THREE.SpriteMaterial({ map: makeGlow(d[2]), transparent: true, opacity: d[4], blending: THREE.AdditiveBlending, depthWrite: false });
-    var g = new THREE.Sprite(gMat); g.scale.set(0.4, 0.4, 1); p.add(g);
+    var g = new THREE.Sprite(gMat); g.scale.set(0.25, 0.25, 1); p.add(g);
     scene.add(p); planets.push(p);
   });
 
-  // === SHOOTING STARS ===
-  for (var si = 0; si < 3; si++) {
+  // === SHOOTING STARS (5 for more activity) ===
+  for (var si = 0; si < 5; si++) {
     var sGeo = new THREE.BufferGeometry();
     var sPos = new Float32Array(6);
     sGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
     var sMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending });
     var sLine = new THREE.Line(sGeo, sMat);
-    sLine.userData = { active: false, timer: Math.random() * 200, speed: 0.15 + Math.random() * 0.1, dir: new THREE.Vector3() };
+    sLine.userData = { active: false, timer: 50 + Math.random() * 150, speed: 0.12 + Math.random() * 0.1, dir: new THREE.Vector3() };
     scene.add(sLine);
     shootingStars.push(sLine);
   }
 
-  // === BACKGROUND STARS ===
-  var bgPos = new Float32Array(800 * 3);
-  var bgCol = new Float32Array(800 * 3);
-  for (var b = 0; b < 800; b++) {
-    bgPos[b*3] = (Math.random()-0.5)*60; bgPos[b*3+1] = (Math.random()-0.5)*60; bgPos[b*3+2] = (Math.random()-0.5)*60;
-    var bri = 0.3 + Math.random() * 0.7;
-    bgCol[b*3] = bri; bgCol[b*3+1] = bri; bgCol[b*3+2] = bri + Math.random() * 0.1;
+  // === BACKGROUND STARS (more, with realistic color temperature) ===
+  var bgCount = 1200;
+  var bgPos = new Float32Array(bgCount * 3);
+  var bgCol = new Float32Array(bgCount * 3);
+  for (var b = 0; b < bgCount; b++) {
+    bgPos[b*3] = (Math.random()-0.5)*80; bgPos[b*3+1] = (Math.random()-0.5)*80; bgPos[b*3+2] = (Math.random()-0.5)*80;
+    var starType = Math.random();
+    if (starType > 0.9) {
+      // Blue-white
+      bgCol[b*3] = 0.7; bgCol[b*3+1] = 0.8; bgCol[b*3+2] = 1;
+    } else if (starType > 0.7) {
+      // White
+      var w = 0.5 + Math.random() * 0.5;
+      bgCol[b*3] = w; bgCol[b*3+1] = w; bgCol[b*3+2] = w;
+    } else if (starType > 0.4) {
+      // Yellow
+      bgCol[b*3] = 0.6; bgCol[b*3+1] = 0.55; bgCol[b*3+2] = 0.35;
+    } else {
+      // Dim orange-red
+      bgCol[b*3] = 0.4; bgCol[b*3+1] = 0.25; bgCol[b*3+2] = 0.15;
+    }
   }
   var bgGeo = new THREE.BufferGeometry();
   bgGeo.setAttribute('position', new THREE.BufferAttribute(bgPos, 3));
   bgGeo.setAttribute('color', new THREE.BufferAttribute(bgCol, 3));
-  scene.add(new THREE.Points(bgGeo, new THREE.PointsMaterial({ size: 0.025, vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })));
+  scene.add(new THREE.Points(bgGeo, new THREE.PointsMaterial({ size: 0.02, vertexColors: true, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false })));
 
   // === TEXT SPRITES ===
   createTexts();
