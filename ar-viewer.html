@@ -411,8 +411,7 @@ function animate() {
   requestAnimationFrame(animate);
   var t = Date.now() * 0.001;
 
-  // Galaxy rotate — smooth constant speed
-  if (galaxyParticles) galaxyParticles.rotation.y = t * 0.03;
+  // Galaxy — static, no rotation
 
   // Auto-rotate camera — smooth sine wave for gentle orbit
   if (autoRotate) targetSpherical.theta = t * 0.05;
