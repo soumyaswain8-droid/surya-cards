@@ -270,29 +270,62 @@ function initGalaxy() {
     nebulaSprites.push(s);
   });
 
-  // === DUST LANES (dark absorption between arms) ===
-  var dustCount = 1500;
+  // === DUST LANES & CLOUDS (thick, moves with galaxy) ===
+  var dustCount = 4000;
   var dPos = new Float32Array(dustCount * 3);
   var dCol = new Float32Array(dustCount * 3);
   for (var di = 0; di < dustCount; di++) {
     var dArm = Math.floor(Math.random() * 4);
-    var dArmAngle = (dArm / 4) * Math.PI * 2 + 0.35; // offset between arms
-    var dDist = 1.0 + Math.pow(Math.random(), 0.5) * 5;
+    var dArmAngle = (dArm / 4) * Math.PI * 2 + 0.3;
+    var dDist = 0.6 + Math.pow(Math.random(), 0.5) * 6;
     var dSpiral = dDist * 0.55 + dArmAngle;
-    var dScatter = (Math.random() - 0.5) * 0.3;
+    // Thick clumpy scatter — clusters of dust
+    var clump = Math.random() < 0.3 ? 0.08 : 0.5;
+    var dScatter = (Math.random() - 0.5) * clump;
     dPos[di*3]   = Math.cos(dSpiral) * dDist + dScatter;
-    dPos[di*3+1] = (Math.random() - 0.5) * 0.06;
+    dPos[di*3+1] = (Math.random() - 0.5) * 0.15; // thicker vertical spread
     dPos[di*3+2] = Math.sin(dSpiral) * dDist + dScatter;
-    // Very dark reddish-brown — absorbs light
-    dCol[di*3] = 0.12; dCol[di*3+1] = 0.05; dCol[di*3+2] = 0.02;
+    // Varying dust colors — dark brown, warm brown, reddish
+    var dustShade = Math.random();
+    if (dustShade > 0.7) {
+      dCol[di*3] = 0.18; dCol[di*3+1] = 0.08; dCol[di*3+2] = 0.03; // dark brown
+    } else if (dustShade > 0.4) {
+      dCol[di*3] = 0.22; dCol[di*3+1] = 0.12; dCol[di*3+2] = 0.05; // warm brown
+    } else {
+      dCol[di*3] = 0.15; dCol[di*3+1] = 0.06; dCol[di*3+2] = 0.06; // reddish
+    }
   }
   var dGeo = new THREE.BufferGeometry();
   dGeo.setAttribute('position', new THREE.BufferAttribute(dPos, 3));
   dGeo.setAttribute('color', new THREE.BufferAttribute(dCol, 3));
-  scene.add(new THREE.Points(dGeo, new THREE.PointsMaterial({
-    size: 0.08, map: makeStar(), transparent: true, opacity: 0.15,
+  var dustParticles = new THREE.Points(dGeo, new THREE.PointsMaterial({
+    size: 0.14, map: makeStar(), transparent: true, opacity: 0.2,
     vertexColors: true, blending: THREE.NormalBlending, depthWrite: false, sizeAttenuation: true
-  })));
+  }));
+  scene.add(dustParticles);
+
+  // Large dust cloud sprites for thick visible bands
+  var dustClouds = [];
+  var dustCloudData = [
+    { x: 1.8, z: 2.5, s: 2.0, o: 0.06 },
+    { x: -2.5, z: -1.5, s: 2.5, o: 0.05 },
+    { x: 3.5, z: -2.0, s: 1.8, o: 0.05 },
+    { x: -1.0, z: 3.0, s: 2.2, o: 0.04 },
+    { x: -3.8, z: 0.5, s: 2.0, o: 0.05 },
+    { x: 2.0, z: -3.5, s: 2.5, o: 0.04 },
+    { x: 0.5, z: 1.2, s: 1.5, o: 0.06 },
+    { x: -1.5, z: -3.0, s: 2.0, o: 0.04 },
+  ];
+  dustCloudData.forEach(function(dc) {
+    var mat = new THREE.SpriteMaterial({ map: makeNebula(0x1a0a04), transparent: true, opacity: dc.o, blending: THREE.NormalBlending, depthWrite: false });
+    var sp = new THREE.Sprite(mat);
+    sp.position.set(dc.x, 0, dc.z);
+    sp.scale.set(dc.s, dc.s * 0.3, 1);
+    scene.add(sp);
+    dustClouds.push(sp);
+  });
+  window._dustParticles = dustParticles;
+  window._dustClouds = dustClouds;
 
   // === ORBIT RINGS (thinner, more subtle) ===
   [[1.3, 0xFFB800, 0.06], [2.2, 0x00c8ff, 0.04], [3.5, 0xa855f7, 0.03]].forEach(function(r) {
@@ -517,8 +550,16 @@ function animate() {
   requestAnimationFrame(animate);
   var t = Date.now() * 0.001;
 
-  // Galaxy rotate
-  if (galaxyParticles) galaxyParticles.rotation.y += 0.0006;
+  // Galaxy rotate — all layers together
+  var galaxyRot = 0.0005;
+  if (galaxyParticles) galaxyParticles.rotation.y += galaxyRot;
+  if (window._dustParticles) window._dustParticles.rotation.y += galaxyRot;
+  if (window._dustClouds) window._dustClouds.forEach(function(dc) {
+    var angle = galaxyRot;
+    var cx = dc.position.x, cz = dc.position.z;
+    dc.position.x = cx * Math.cos(angle) - cz * Math.sin(angle);
+    dc.position.z = cx * Math.sin(angle) + cz * Math.cos(angle);
+  });
 
   // Auto-rotate camera
   if (autoRotate) targetSpherical.theta += 0.001;
