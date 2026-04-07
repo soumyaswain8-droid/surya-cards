@@ -131,11 +131,7 @@ function initGalaxy() {
   // Inner sphere
   sun.add(new THREE.Mesh(new THREE.SphereGeometry(0.25, 32, 32), new THREE.MeshBasicMaterial({ color: 0xFFB800 })));
 
-  // Glow layers
-  [{ s: 1.8, o: 0.5, c: 0xFFB800 }, { s: 3.5, o: 0.2, c: 0xff8c00 }, { s: 5.0, o: 0.08, c: 0xff6600 }].forEach(function(g) {
-    var m = new THREE.SpriteMaterial({ map: makeGlow(g.c), transparent: true, opacity: g.o, blending: THREE.AdditiveBlending, depthWrite: false });
-    var s = new THREE.Sprite(m); s.scale.set(g.s, g.s, 1); sun.add(s);
-  });
+  // No glow — clean sun
 
   // === GALAXY SPIRAL (6000 particles) ===
   var count = 6000;
@@ -415,16 +411,16 @@ function animate() {
   requestAnimationFrame(animate);
   var t = Date.now() * 0.001;
 
-  // Galaxy rotate
-  if (galaxyParticles) galaxyParticles.rotation.y += 0.0006;
+  // Galaxy rotate — smooth constant speed
+  if (galaxyParticles) galaxyParticles.rotation.y = t * 0.03;
 
-  // Auto-rotate camera
-  if (autoRotate) targetSpherical.theta += 0.001;
+  // Auto-rotate camera — smooth sine wave for gentle orbit
+  if (autoRotate) targetSpherical.theta = t * 0.05;
 
-  // Smooth camera
-  spherical.theta += (targetSpherical.theta - spherical.theta) * 0.04;
-  spherical.phi += (targetSpherical.phi - spherical.phi) * 0.04;
-  spherical.radius += (targetSpherical.radius - spherical.radius) * 0.04;
+  // Smooth camera interpolation (lower = smoother)
+  spherical.theta += (targetSpherical.theta - spherical.theta) * 0.025;
+  spherical.phi += (targetSpherical.phi - spherical.phi) * 0.025;
+  spherical.radius += (targetSpherical.radius - spherical.radius) * 0.025;
   updateCamera();
 
   // Sun pulse
